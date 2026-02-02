@@ -1,5 +1,5 @@
 import os
-import dj_database_url # เพิ่มการนำเข้า library สำหรับจัดการ Database URL
+import dj_database_url 
 from pathlib import Path
 from decouple import config
 from datetime import timedelta
@@ -153,16 +153,17 @@ SIMPLE_JWT = {
     'SIGNING_KEY': config('JWT_SECRET', default=SECRET_KEY),
 }
 
-# Google Gemini API
+# --- จุดที่ 1: Google Gemini API (ดึงค่าจาก Environment) ---
 GEMINI_API_KEY = config('GEMINI_API_KEY', default='')
 
-# Email Configuration
-EMAIL_BACKEND = config('EMAIL_BACKEND', default='django.core.mail.backends.console.EmailBackend')
+# --- จุดที่ 2: Email Configuration (ปรับจาก console เป็น smtp ตาม Guide) ---
+# ใช้ smtp เพื่อให้ส่งเมลยืนยันตัวตนได้จริง
+EMAIL_BACKEND = config('EMAIL_BACKEND', default='django.core.mail.backends.smtp.EmailBackend')
 EMAIL_HOST = config('EMAIL_HOST', default='smtp.gmail.com')
 EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
 EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
 EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
-EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
+EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='') # App Password จาก Google
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
 # Celery Configuration
