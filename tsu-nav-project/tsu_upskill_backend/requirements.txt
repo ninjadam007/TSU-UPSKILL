@@ -17,6 +17,3 @@ whitenoise==6.6.0
 cryptography==41.0.7
 django-filter==23.5
 
-
-
-
