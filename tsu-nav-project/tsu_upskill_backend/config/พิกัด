@@ -1,0 +1,13 @@
+from django.db import models
+
+class LocationCategory(models.Model):
+    name = models.CharField(max_length=100)
+    icon = models.CharField(max_length=50) # fa-building
+
+class Location(models.Model):
+    name = models.CharField(max_length=200)
+    category = models.ForeignKey(LocationCategory, on_delete=models.CASCADE)
+    latitude = models.FloatField()
+    longitude = models.FloatField()
+    description = models.TextField()
+    building_code = models.CharField(max_length=20)
