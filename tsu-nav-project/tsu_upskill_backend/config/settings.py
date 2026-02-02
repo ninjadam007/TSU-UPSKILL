@@ -224,15 +224,15 @@ SECURE_CONTENT_SECURITY_POLICY = {
     "default-src": ("'self'",),
 }
 
-# Rate Limiting
-RATELIMIT_ENABLE = True
-RATELIMIT_USE_CACHE = 'default'
-AUTH_USER_MODEL = 'users.CustomUser'
+# ... (Security Settings) ...
+
+RATELIMIT_ENABLE = False
+
 CACHES = {
     'default': {
-        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'BACKEND': 'django.core.cache.backends.dummy.DummyCache',
     }
 }
 
-
+AUTH_USER_MODEL = 'users.CustomUser'
 
