@@ -1,0 +1,12 @@
+const login = async (studentId, password) => {
+  const response = await fetch('http://localhost:8000/api/auth/login/', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ student_id: studentId, password: password })
+  });
+  const data = await response.json();
+  if (data.access) {
+    localStorage.setItem('token', data.access); // เก็บ Token ไว้ใช้ต่อ
+    alert('เข้าสู่ระบบสำเร็จ!');
+  }
+};
