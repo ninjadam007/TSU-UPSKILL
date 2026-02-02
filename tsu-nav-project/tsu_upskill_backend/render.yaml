@@ -2,11 +2,16 @@ services:
   - type: web
     name: tsu-upskill-backend
     runtime: python
+
+    rootDir: tsu-nav-project/tsu_upskill_backend
+
     buildCommand: >
       pip install -r requirements.txt &&
       python manage.py migrate &&
       python manage.py collectstatic --noinput
-    startCommand: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 2
+
+    startCommand: gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2
+
     envVars:
       - key: DEBUG
         value: false
@@ -51,3 +56,4 @@ databases:
   - name: tsu-upskill-db
     engine: postgres
     version: '15'
+
