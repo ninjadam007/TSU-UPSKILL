@@ -1,6 +1,3 @@
-""""""
-Django settings for TSU UPSKILL Backend
-"""
 import os
 import dj_database_url # เพิ่มการนำเข้า library สำหรับจัดการ Database URL
 from pathlib import Path
@@ -71,8 +68,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'config.wsgi.application'
 
-# --- Database Configuration (แก้ไขส่วนนี้) ---
-# ระบบจะเช็ค DATABASE_URL ก่อน ถ้าไม่มีค่อยไปใช้ค่าแยกรายตัว
+# --- Database Configuration ---
 if config('DATABASE_URL', default=None):
     DATABASES = {
         'default': dj_database_url.config(
@@ -210,7 +206,7 @@ if not DEBUG:
     SECURE_SSL_REDIRECT = True
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
-    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https') # เพิ่มบรรทัดนี้สำหรับ Render
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 CSRF_COOKIE_HTTPONLY = True
 SESSION_COOKIE_HTTPONLY = True
