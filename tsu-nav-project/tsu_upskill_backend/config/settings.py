@@ -180,6 +180,18 @@ CELERY_RESULT_BACKEND = config('CELERY_RESULT_BACKEND', default='redis://localho
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 
+RATELIMIT_ENABLE = True
+RATELIMIT_USE_CACHE = 'default'
+
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+        'LOCATION': config('CELERY_BROKER_URL', default='redis://localhost:6379'),
+    }
+}
+
+AUTH_USER_MODEL = 'users.CustomUser'
+
 # Logging Configuration
 LOGGING = {
     'version': 1,
@@ -223,4 +235,5 @@ CACHES = {
         'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
     }
 }
+
 
