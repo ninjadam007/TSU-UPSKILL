@@ -1,7 +1,8 @@
-"""
+""""""
 Django settings for TSU UPSKILL Backend
 """
 import os
+import dj_database_url # เพิ่มการนำเข้า library สำหรับจัดการ Database URL
 from pathlib import Path
 from decouple import config
 from datetime import timedelta
@@ -29,7 +30,6 @@ INSTALLED_APPS = [
     # Third party apps
     'rest_framework',
     'corsheaders',
-    # 'django_ratelimit',  # ปิดไว้ชั่วคราวเพื่อแก้ปัญหา Build Failed E003
     'celery',
     
     # Local apps
@@ -71,19 +71,29 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'config.wsgi.application'
 
-# Database Configuration
-DATABASES = {
-    'default': {
-        'ENGINE': config('DB_ENGINE', default='django.db.backends.postgresql'),
-        'NAME': config('DB_NAME', default='tsu_upskill'),
-        'USER': config('DB_USER', default='postgres'),
-        'PASSWORD': config('DB_PASSWORD', default=''),
-        'HOST': config('DB_HOST', default='localhost'),
-        'PORT': config('DB_PORT', default='5432'),
-        'CONN_MAX_AGE': 600,
-        'ATOMIC_REQUESTS': True,
+# --- Database Configuration (แก้ไขส่วนนี้) ---
+# ระบบจะเช็ค DATABASE_URL ก่อน ถ้าไม่มีค่อยไปใช้ค่าแยกรายตัว
+if config('DATABASE_URL', default=None):
+    DATABASES = {
+        'default': dj_database_url.config(
+            default=config('DATABASE_URL'),
+            conn_max_age=600,
+            conn_health_checks=True,
+        )
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': config('DB_ENGINE', default='django.db.backends.postgresql'),
+            'NAME': config('DB_NAME', default='tsu_upskill'),
+            'USER': config('DB_USER', default='postgres'),
+            'PASSWORD': config('DB_PASSWORD', default=''),
+            'HOST': config('DB_HOST', default='localhost'),
+            'PORT': config('DB_PORT', default='5432'),
+            'CONN_MAX_AGE': 600,
+            'ATOMIC_REQUESTS': True,
+        }
+    }
 
 # User Model Configuration
 AUTH_USER_MODEL = 'users.CustomUser'
@@ -126,7 +136,6 @@ REST_FRAMEWORK = {
         'rest_framework.filters.SearchFilter',
         'rest_framework.filters.OrderingFilter',
     ],
-    # ปิด Throttle ไว้ก่อนจนกว่าจะเซ็ตอัพ Cache จริงเสร็จ
     'DEFAULT_THROTTLE_CLASSES': [],
     'DEFAULT_THROTTLE_RATES': {
         'anon': '100/hour',
@@ -167,7 +176,6 @@ CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 
 # --- Cache Configuration ---
-# ใช้ LocMemCache เพราะตอนนี้ไม่มีแอปไหนมา Check แล้ว จะเสถียรกว่า Dummy
 CACHES = {
     'default': {
         'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
@@ -198,9 +206,12 @@ LOGGING = {
 }
 
 # Security Settings
-SECURE_SSL_REDIRECT = not DEBUG
-SESSION_COOKIE_SECURE = not DEBUG
-CSRF_COOKIE_SECURE = not DEBUG
+if not DEBUG:
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https') # เพิ่มบรรทัดนี้สำหรับ Render
+
 CSRF_COOKIE_HTTPONLY = True
 SESSION_COOKIE_HTTPONLY = True
 X_FRAME_OPTIONS = 'DENY'
