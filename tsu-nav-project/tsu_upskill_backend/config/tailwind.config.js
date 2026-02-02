@@ -1,16 +1,21 @@
 // tailwind.config.js
+/** @type {import('tailwindcss').Config} */
 module.exports = {
-  darkMode: 'class', // รองรับการสลับโหมดมืด
+  darkMode: 'class',
+  content: [
+    "./src/**/*.{js,jsx,ts,tsx}",
+  ],
   theme: {
     extend: {
       colors: {
         tsu: {
-          blue: '#0056b3',   // ฟ้า TSU
-          orange: '#ff8c00', // ส้ม TSU
-          light: '#f8f9fa',  // ขาวนวล
-          dark: '#121212',   // ดำเข้ม (Dark Mode)
+          blue: '#0056b3',
+          orange: '#ff8c00',
+          light: '#f8f9fa',
+          dark: '#121212',
         }
       }
     },
   },
+  plugins: [],
 }
