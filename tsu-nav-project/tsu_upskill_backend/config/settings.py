@@ -50,6 +50,9 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'config.urls'
 
+from pathlib import Path
+BASE_DIR = Path(__file__).resolve().parent.parent
+
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
@@ -65,6 +68,7 @@ TEMPLATES = [
         },
     },
 ]
+
 
 WSGI_APPLICATION = 'config.wsgi.application'
 
@@ -212,3 +216,4 @@ if not DEBUG:
 CSRF_COOKIE_HTTPONLY = True
 SESSION_COOKIE_HTTPONLY = True
 X_FRAME_OPTIONS = 'DENY'
+
