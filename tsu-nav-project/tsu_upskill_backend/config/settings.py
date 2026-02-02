@@ -217,5 +217,10 @@ SECURE_CONTENT_SECURITY_POLICY = {
 # Rate Limiting
 RATELIMIT_ENABLE = True
 RATELIMIT_USE_CACHE = 'default'
-
+AUTH_USER_MODEL = 'users.CustomUser'
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+    }
+}
 
