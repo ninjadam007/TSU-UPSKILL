@@ -3,6 +3,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.utils import timezone
+from django.db import transaction # เพิ่มการใช้ Transaction เพื่อความปลอดภัยของข้อมูล
 
 from .models import ChatSession, Message, PendingAdminQuestion
 from .serializers import (
@@ -12,39 +13,42 @@ from .serializers import (
 from utils.gemini_service import get_gemini_response
 
 class ChatSessionViewSet(viewsets.ModelViewSet):
-    """Chat session management"""
+    """ระบบจัดการ Session การแชทสำหรับนิสิต"""
     serializer_class = ChatSessionSerializer
     permission_classes = [IsAuthenticated]
     
     def get_queryset(self):
-        return ChatSession.objects.filter(user=self.request.user)
+        # ดึงเฉพาะแชทของตัวเอง และเอาข้อความล่าสุดขึ้นก่อน
+        return ChatSession.objects.filter(user=self.request.user).order_by('-updated_at')
     
-    def create(self, request, *args, **kwargs):
-        """Create a new chat session"""
-        session = ChatSession.objects.create(user=request.user)
-        serializer = self.get_serializer(session)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    def perform_create(self, serializer):
+        # บันทึก User ลงใน Session โดยอัตโนมัติ
+        serializer.save(user=self.request.user)
     
-    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+    @action(detail=True, methods=['post'])
     def send_message(self, request, pk=None):
-        """Send a message to the AI"""
+        """ส่งข้อความไปหา AI และรอรับคำตอบ"""
         session = self.get_object()
         serializer = SendMessageSerializer(data=request.data)
         
-        if serializer.is_valid():
-            user_message = serializer.validated_data['content']
-            
-            # Save user message
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        user_content = serializer.validated_data['content']
+
+        # ใช้ transaction.atomic เพื่อให้มั่นใจว่าถ้าบันทึกพลาด จะไม่บันทึกอะไรเลย
+        with transaction.atomic():
+            # 1. บันทึกข้อความนิสิต
             user_msg = Message.objects.create(
                 session=session,
                 sender=Message.SENDER_USER,
-                content=user_message
+                content=user_content
             )
             
-            # Get AI response
-            ai_response, is_fallback = get_gemini_response(user_message, session)
+            # 2. เรียกใช้ Gemini (ส่งข้อมูล Session ไปด้วยเพื่อให้ AI จำบริบทเก่าได้)
+            ai_response, is_fallback = get_gemini_response(user_content, session)
             
-            # Save AI message
+            # 3. บันทึกข้อความจาก AI
             ai_msg = Message.objects.create(
                 session=session,
                 sender=Message.SENDER_AI,
@@ -52,85 +56,74 @@ class ChatSessionViewSet(viewsets.ModelViewSet):
                 is_fallback_to_admin=is_fallback
             )
             
-            # If fallback, create pending question for admin
+            # 4. ถ้า AI ตอบไม่ได้ ให้สร้างตั๋วรอแอดมิน James
             if is_fallback:
-                PendingAdminQuestion.objects.create(message=ai_msg)
+                PendingAdminQuestion.objects.get_or_create(message=ai_msg)
             
-            # Update session title if it's the first message
-            if session.messages.count() == 2:  # user + ai message
-                session.title = user_message[:50]
+            # 5. อัปเดตชื่อ Session ถ้าเป็นข้อความแรกของแชท
+            if session.messages.count() <= 2: # user + ai message
+                session.title = user_content[:50]
                 session.save()
-            
-            return Response({
-                'success': True,
-                'messages': MessageSerializer([user_msg, ai_msg], many=True).data,
-                'is_fallback': is_fallback
-            }, status=status.HTTP_200_OK)
-        
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-    @action(detail=True, methods=['get'], permission_classes=[IsAuthenticated])
+
+        return Response({
+            'success': True,
+            'messages': MessageSerializer([user_msg, ai_msg], many=True).data,
+            'is_fallback': is_fallback
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['get'])
     def messages(self, request, pk=None):
-        """Get all messages in a session"""
+        """ดึงประวัติข้อความทั้งหมดในแชทนี้"""
         session = self.get_object()
-        messages = session.messages.all()
-        page = self.paginate_queryset(messages)
-        if page is not None:
-            serializer = MessageSerializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
-        
+        messages = session.messages.all().order_by('created_at')
         serializer = MessageSerializer(messages, many=True)
         return Response(serializer.data)
 
 
 class PendingAdminQuestionViewSet(viewsets.ViewSet):
-    """Admin view for pending questions"""
+    """ส่วนของแอดมินสำหรับจัดการคำถามที่ AI ตอบไม่ได้"""
     permission_classes = [IsAuthenticated]
     
     def list(self, request):
-        """List all pending questions (admin only)"""
         if not request.user.is_admin():
-            return Response({
-                'error': 'Only admins can view pending questions'
-            }, status=status.HTTP_403_FORBIDDEN)
+            return Response({'error': 'เฉพาะแอดมินเท่านั้นครับ'}, status=status.HTTP_403_FORBIDDEN)
         
         pending = PendingAdminQuestion.objects.filter(
             status=PendingAdminQuestion.STATUS_PENDING
-        )
+        ).order_by('-created_at')
         serializer = PendingAdminQuestionSerializer(pending, many=True)
         return Response(serializer.data)
     
-    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+    @action(detail=True, methods=['post'])
     def respond(self, request, pk=None):
-        """Admin responds to a pending question"""
+        """แอดมินพิมพ์ตอบคำถาม"""
         if not request.user.is_admin():
-            return Response({
-                'error': 'Only admins can respond to questions'
-            }, status=status.HTTP_403_FORBIDDEN)
+            return Response({'error': 'สิทธิ์ไม่เพียงพอ'}, status=status.HTTP_403_FORBIDDEN)
         
         try:
             pending = PendingAdminQuestion.objects.get(pk=pk)
             response_content = request.data.get('response')
-            
-            # Create admin response
-            admin_msg = Message.objects.create(
-                session=pending.message.session,
-                sender=Message.SENDER_ADMIN,
-                content=response_content,
-                admin_user=request.user
-            )
-            
-            # Mark as answered
-            pending.status = PendingAdminQuestion.STATUS_ANSWERED
-            pending.answered_at = timezone.now()
-            pending.save()
+
+            if not response_content:
+                return Response({'error': 'กรุณาใส่ข้อความตอบกลับ'}, status=status.HTTP_400_BAD_REQUEST)
+
+            with transaction.atomic():
+                # สร้างข้อความแอดมิน
+                admin_msg = Message.objects.create(
+                    session=pending.message.session,
+                    sender=Message.SENDER_ADMIN,
+                    content=response_content,
+                    admin_user=request.user
+                )
+                # ปิดสถานะคำถาม
+                pending.status = PendingAdminQuestion.STATUS_ANSWERED
+                pending.answered_at = timezone.now()
+                pending.save()
             
             return Response({
                 'success': True,
                 'message': MessageSerializer(admin_msg).data
             }, status=status.HTTP_200_OK)
-        
+            
         except PendingAdminQuestion.DoesNotExist:
-            return Response({
-                'error': 'Question not found'
-            }, status=status.HTTP_404_NOT_FOUND)
+            return Response({'error': 'ไม่พบรายการนี้'}, status=status.HTTP_404_NOT_FOUND)
