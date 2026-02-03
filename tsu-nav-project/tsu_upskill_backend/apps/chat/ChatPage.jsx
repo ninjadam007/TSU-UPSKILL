@@ -1,23 +1,22 @@
 import React, { useState, useEffect, useRef } from 'react';
 
 const ChatPage = () => {
-  const [darkMode, setDarkMode] = useState(false); // สมมติว่ามี state สำหรับ Dark Mode
-  const [currentSession, setCurrentSession] = useState(null); // Session ที่กำลังแชทอยู่
-  const [sessions, setSessions] = useState([]); // รายการ Session ทั้งหมด
-  const [messages, setMessages] = useState([]); // ข้อความใน Session ปัจจุบัน
+  const [darkMode, setDarkMode] = useState(false);
+  const [currentSession, setCurrentSession] = useState(null);
+  const [sessions, setSessions] = useState([]);
+  const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState('');
+  const [isLoading, setIsLoading] = useState(false); // เพิ่มเพื่อกันบัคกดส่งรัวๆ
   const messagesEndRef = useRef(null);
 
-  const API_BASE_URL = 'http://localhost:8000/api'; // อย่าลืมเปลี่ยนเป็น Production URL เมื่อ Deploy
-  const token = localStorage.getItem('access_token'); // ต้องเก็บ token หลังจาก Login
+  const API_BASE_URL = 'http://localhost:8000/api';
+  const token = localStorage.getItem('access_token');
 
   useEffect(() => {
-    // โหลด Sessions เมื่อ Component โหลดครั้งแรก
     fetchSessions();
   }, []);
 
   useEffect(() => {
-    // เลื่อน Scroll ไปล่างสุดเมื่อมีข้อความใหม่
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
@@ -27,10 +26,12 @@ const ChatPage = () => {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await response.json();
-      setSessions(data.results || []);
-      if (data.results && data.results.length > 0) {
-        // เลือก Session ล่าสุด หรือสร้างใหม่
-        await selectSession(data.results[0].id); 
+      const results = data.results || [];
+      setSessions(results);
+      
+      if (results.length > 0) {
+        // เลือกอันแรกถ้ายังไม่มีการเลือก
+        if (!currentSession) await selectSession(results[0].id);
       } else {
         await createNewSession();
       }
@@ -50,8 +51,8 @@ const ChatPage = () => {
       });
       const data = await response.json();
       setCurrentSession(data);
-      setMessages([]); // ล้างข้อความสำหรับ Session ใหม่
-      fetchSessions(); // โหลด Sessions ใหม่หลังจากสร้าง
+      setMessages([]);
+      fetchSessions();
     } catch (error) {
       console.error("Error creating new session:", error);
     }
@@ -63,20 +64,27 @@ const ChatPage = () => {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await response.json();
-      const selectedSession = sessions.find(s => s.id === sessionId);
-      setCurrentSession(selectedSession);
+      const selected = sessions.find(s => s.id === sessionId) || { id: sessionId };
+      setCurrentSession(selected);
       setMessages(data.results || []);
     } catch (error) {
-      console.error("Error fetching messages for session:", error);
+      console.error("Error fetching messages:", error);
     }
   };
 
   const sendMessage = async () => {
-    if (inputMessage.trim() === '' || !currentSession) return;
+    if (inputMessage.trim() === '' || !currentSession || isLoading) return;
 
-    const userMessage = { sender: 'user', content: inputMessage, created_at: new Date().toISOString() };
-    setMessages(prevMessages => [...prevMessages, userMessage]); // แสดงข้อความผู้ใช้ทันที
+    const userMessage = { 
+      sender: 'user', 
+      content: inputMessage, 
+      created_at: new Date().toISOString() 
+    };
+    
+    // แสดงข้อความฝั่งผู้ใช้ทันที
+    setMessages(prev => [...prev, userMessage]);
     setInputMessage('');
+    setIsLoading(true);
 
     try {
       const response = await fetch(`${API_BASE_URL}/chat/sessions/${currentSession.id}/send-message/`, {
@@ -87,104 +95,116 @@ const ChatPage = () => {
         },
         body: JSON.stringify({ content: userMessage.content })
       });
+      
+      if (!response.ok) throw new Error('Network error');
+      
       const data = await response.json();
-
-      // Backend จะส่งข้อความกลับมาทั้ง User และ AI (หรือ Admin)
-      // เราจะอัปเดตข้อความทั้งหมดตามที่ Backend ส่งมาเพื่อความถูกต้อง
+      // อัปเดตข้อความทั้งหมด (รวมคำตอบ AI)
       setMessages(data.messages || []); 
-
-      // อัปเดตข้อมูล Session ล่าสุด
       fetchSessions();
 
     } catch (error) {
       console.error("Error sending message:", error);
-      // กรณีเกิดข้อผิดพลาด อาจจะแสดงข้อความว่าส่งไม่สำเร็จ
-      setMessages(prevMessages => [...prevMessages, { sender: 'system', content: 'ส่งข้อความไม่สำเร็จ', created_at: new Date().toISOString() }]);
+      setMessages(prev => [...prev, { 
+        sender: 'system', 
+        content: 'ขออภัยครับพี่ชาย ส่งข้อความไม่สำเร็จ กรุณาลองใหม่นะ', 
+        created_at: new Date().toISOString() 
+      }]);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
-    <div className={`${darkMode ? 'dark' : ''} min-h-screen flex flex-col bg-tsu-light dark:bg-tsu-dark text-gray-900 dark:text-white`}>
+    <div className={`${darkMode ? 'dark' : ''} min-h-screen flex flex-col bg-tsu-light dark:bg-tsu-dark text-gray-900 dark:text-white transition-colors duration-200`}>
       {/* Header */}
-      <header className="p-4 flex justify-between items-center border-b border-tsu-blue dark:border-tsu-orange">
-        <h1 className="text-2xl font-bold text-tsu-blue dark:text-tsu-orange">TSU AI Chatbot</h1>
+      <header className="p-4 flex justify-between items-center border-b border-tsu-blue dark:border-tsu-orange bg-white dark:bg-gray-800">
+        <h1 className="text-2xl font-bold text-tsu-blue dark:text-tsu-orange">TSU AI Assistant</h1>
         <button
           onClick={() => setDarkMode(!darkMode)}
-          className="p-2 rounded-full bg-tsu-blue text-white dark:bg-tsu-orange"
+          className="p-2 px-4 rounded-full bg-tsu-blue text-white dark:bg-tsu-orange hover:opacity-90 transition-all"
         >
-          {darkMode ? '🌙 Dark Mode' : '☀️ Light Mode'}
+          {darkMode ? '☀️ โหมดสว่าง' : '🌙 โหมดมืด'}
         </button>
       </header>
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar for Chat Sessions */}
-        <aside className="w-1/4 p-4 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-y-auto">
+        {/* Sidebar */}
+        <aside className="w-1/4 p-4 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hidden lg:block overflow-y-auto">
           <button
             onClick={createNewSession}
-            className="w-full mb-4 py-2 px-4 rounded-lg bg-green-500 text-white hover:bg-green-600"
+            className="w-full mb-4 py-3 px-4 rounded-xl bg-green-500 text-white hover:bg-green-600 font-bold shadow-sm transition-all"
           >
-            + New Chat
+            + เริ่มแชทใหม่
           </button>
-          {sessions.map(session => (
-            <div
-              key={session.id}
-              onClick={() => selectSession(session.id)}
-              className={`p-3 mb-2 rounded-lg cursor-pointer ${
-                currentSession?.id === session.id
-                  ? 'bg-tsu-blue text-white dark:bg-tsu-orange'
-                  : 'bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600'
-              }`}
-            >
-              <h3 className="font-semibold">{session.title || `Chat #${session.id}`}</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                {session.last_message?.content ? session.last_message.content.substring(0, 30) + '...' : 'No messages yet'}
-              </p>
-            </div>
-          ))}
+          <div className="space-y-2">
+            {sessions.map(session => (
+              <div
+                key={session.id}
+                onClick={() => selectSession(session.id)}
+                className={`p-4 rounded-xl cursor-pointer border transition-all ${
+                  currentSession?.id === session.id
+                    ? 'bg-tsu-blue text-white border-tsu-blue dark:bg-tsu-orange dark:border-tsu-orange shadow-md'
+                    : 'bg-gray-50 hover:bg-gray-100 dark:bg-gray-700 dark:hover:bg-gray-600 border-transparent'
+                }`}
+              >
+                <h3 className="font-semibold truncate">{session.title || `แชท #${session.id}`}</h3>
+                <p className={`text-xs truncate mt-1 ${currentSession?.id === session.id ? 'text-blue-100' : 'text-gray-500'}`}>
+                  {session.last_message?.content || 'ยังไม่มีข้อความ'}
+                </p>
+              </div>
+            ))}
+          </div>
         </aside>
 
         {/* Chat Area */}
         <main className="flex flex-col flex-1 p-4 bg-gray-50 dark:bg-gray-900">
-          <div className="flex-1 overflow-y-auto space-y-4 pr-2">
+          <div className="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar">
             {messages.map((msg, index) => (
-              <div
-                key={index}
-                className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
+              <div key={index} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
                 <div
-                  className={`max-w-md p-3 rounded-lg shadow ${
+                  className={`max-w-[80%] p-4 rounded-2xl shadow-sm ${
                     msg.sender === 'user'
-                      ? 'bg-tsu-blue text-white'
-                      : msg.sender === 'ai'
-                      ? 'bg-gray-200 text-gray-900 dark:bg-gray-700 dark:text-white'
-                      : 'bg-red-200 text-red-800 dark:bg-red-700 dark:text-red-100' // สำหรับ admin หรือ system message
+                      ? 'bg-tsu-blue text-white rounded-tr-none'
+                      : msg.sender === 'ai' || msg.sender === 'model'
+                      ? 'bg-white text-gray-800 dark:bg-gray-700 dark:text-white rounded-tl-none border border-gray-200 dark:border-gray-600'
+                      : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200 rounded-tl-none border border-red-200 dark:border-red-800'
                   }`}
                 >
-                  <p>{msg.content}</p>
-                  <span className="block text-xs text-right opacity-75 mt-1">
+                  <p className="text-sm md:text-base leading-relaxed">{msg.content}</p>
+                  <span className={`block text-[10px] text-right mt-2 opacity-70`}>
                     {new Date(msg.created_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}
                   </span>
                 </div>
               </div>
             ))}
-            <div ref={messagesEndRef} /> {/* สำหรับ Scroll อัตโนมัติ */}
+            {isLoading && (
+              <div className="flex justify-start">
+                <div className="bg-gray-200 dark:bg-gray-700 p-3 rounded-lg animate-pulse text-xs text-gray-500 dark:text-gray-400">
+                  TSU AI กำลังพิมพ์ข้อมูล...
+                </div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
           </div>
 
           {/* Input Area */}
-          <div className="mt-4 flex">
+          <div className="mt-4 flex gap-2 max-w-5xl mx-auto w-full">
             <input
               type="text"
-              className="flex-1 p-3 rounded-l-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-tsu-blue dark:focus:ring-tsu-orange"
-              placeholder="พิมพ์ข้อความที่นี่..."
+              disabled={isLoading}
+              className="flex-1 p-4 rounded-2xl border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-tsu-blue dark:focus:ring-tsu-orange shadow-inner"
+              placeholder={isLoading ? "โปรดรอสักครู่..." : "พิมพ์ข้อความสอบถามที่นี่..."}
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
               onKeyPress={(e) => { if (e.key === 'Enter') sendMessage(); }}
             />
             <button
               onClick={sendMessage}
-              className="p-3 rounded-r-lg bg-tsu-blue text-white dark:bg-tsu-orange hover:bg-opacity-90 transition-opacity"
+              disabled={isLoading}
+              className="px-8 rounded-2xl bg-tsu-blue text-white dark:bg-tsu-orange hover:opacity-90 transition-opacity font-bold shadow-lg disabled:grayscale"
             >
-              ส่ง
+              {isLoading ? '...' : 'ส่ง'}
             </button>
           </div>
         </main>
