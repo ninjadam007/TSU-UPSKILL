@@ -1,98 +1,110 @@
-"""Gemini AI Service Integration"""
+"""Gemini AI Service Integration - Optimized for TSU UPSKILL"""
 import logging
 from django.conf import settings
 import google.generativeai as genai
 
 logger = logging.getLogger(__name__)
 
-# Configure Gemini API
-genai.configure(api_key=settings.GEMINI_API_KEY)
+# ตั้งค่า Gemini API
+if settings.GEMINI_API_KEY:
+    genai.configure(api_key=settings.GEMINI_API_KEY)
+else:
+    logger.error("❌ GEMINI_API_KEY is missing in settings!")
 
-SYSTEM_PROMPT = """You are a helpful assistant for Thassaksin University (TSU) navigation and campus guidance.
-You help students find locations, understand campus directions, and answer general questions about the university.
+# ปรับปรุง SYSTEM_PROMPT ให้ชัดเจนและเน้นบริบทของมหาวิทยาลัย
+SYSTEM_PROMPT = """คุณคือผู้ช่วยอัจฉริยะ (AI Assistant) ของมหาวิทยาลัยทักษิณ (TSU) ภายใต้โปรเจกต์ TSU UPSKILL
+หน้าที่ของคุณคือช่วยเหลือนักศึกษาในการนำทาง ค้นหาสถานที่ และตอบคำถามทั่วไปเกี่ยวกับมหาวิทยาลัย
 
-When answering:
-1. Be friendly and helpful
-2. Provide clear instructions
-3. If you don't know the answer, admit it and suggest asking an admin
-4. Keep responses concise and easy to understand
-5. Always respond in Thai or English based on the user's language"""
+กฎในการตอบ:
+1. ตอบด้วยความเป็นมิตร สุภาพ และเป็นกันเอง (พี่ชาย/น้องสาว/ครับ/ค่ะ)
+2. ให้ข้อมูลเส้นทางหรือตำแหน่งที่ชัดเจน
+3. หากคุณไม่ทราบคำตอบจริงๆ หรือข้อมูลมีความซับซ้อน ให้ตอบว่า "ขออภัยครับ ข้อมูลส่วนนี้ผมไม่แน่ใจ เพื่อความถูกต้อง ผมขอส่งเรื่องต่อให้แอดมินตรวจสอบให้นะครับ" และส่งค่า True ในระบบ Fallback
+4. ตอบสั้น กระชับ เข้าใจง่าย
+5. ตอบเป็นภาษาไทยเป็นหลัก เว้นแต่ผู้ใช้จะถามเป็นภาษาอังกฤษ"""
 
 def get_gemini_response(user_message: str, chat_session=None) -> tuple:
     """
-    Get response from Google Gemini API
-    
+    รับคำตอบจาก Google Gemini API พร้อมระบบตรวจจับความไม่แน่ใจ
     Returns:
         tuple: (response_text, is_fallback_to_admin)
     """
     try:
         if not settings.GEMINI_API_KEY:
-            logger.warning("GEMINI_API_KEY not configured")
-            return "I'm unable to respond right now. Please wait for admin support.", True
+            logger.warning("⚠️ GEMINI_API_KEY not configured")
+            return "ขณะนี้ระบบ AI ยังไม่พร้อมใช้งาน กรุณารอการตอบกลับจากแอดมินครับ", True
         
-        model = genai.GenerativeModel('gemini-pro')
+        # เลือกใช้ model (gemini-1.5-flash หรือ gemini-pro)
+        model = genai.GenerativeModel('gemini-1.5-flash')
         
-        # Build conversation history if session exists
-        messages = []
+        # สร้างรายการข้อความเริ่มต้นด้วย SYSTEM_PROMPT
+        # หมายเหตุ: สำหรับ Gemini เรามักจะใส่ System instruction ไว้ตอนสร้าง Model 
+        # หรือใส่เป็นข้อความแรกของประวัติการคุย
+        formatted_messages = [
+            {'role': 'user', 'parts': [SYSTEM_PROMPT]},
+            {'role': 'model', 'parts': ["รับทราบครับ ผมพร้อมช่วยเหลือสมาชิก TSU UPSKILL ทุกท่านแล้วครับ"]}
+        ]
+        
+        # ดึงประวัติการคุยจาก Database (ถ้ามี)
         if chat_session:
-            for msg in chat_session.messages.all().order_by('created_at'):
-                if msg.sender == 'user':
-                    messages.append({
-                        'role': 'user',
-                        'parts': [msg.content]
-                    })
-                elif msg.sender == 'ai':
-                    messages.append({
-                        'role': 'model',
-                        'parts': [msg.content]
-                    })
+            # ดึง 10 ข้อความล่าสุดเพื่อประหยัด Token และคงบริบท
+            db_messages = chat_session.messages.all().order_by('created_at')[:10]
+            for msg in db_messages:
+                role = 'user' if msg.sender == 'user' else 'model'
+                formatted_messages.append({
+                    'role': role,
+                    'parts': [msg.content]
+                })
         
-        # Add current message
-        messages.append({
+        # เพิ่มคำถามปัจจุบันของผู้ใช้
+        formatted_messages.append({
             'role': 'user',
             'parts': [user_message]
         })
         
-        # Get response from Gemini
+        # เรียกใช้ Gemini
         try:
             response = model.generate_content(
-                contents=messages,
-                stream=False,
+                contents=formatted_messages,
+                generation_config=genai.types.GenerationConfig(
+                    temperature=0.7,
+                    top_p=0.9,
+                    max_output_tokens=1000,
+                ),
                 safety_settings=[
-                    {
-                        "category": "HARM_CATEGORY_DANGEROUS",
-                        "threshold": "BLOCK_NONE",
-                    },
+                    {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_ONLY_HIGH"},
+                    {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_ONLY_HIGH"},
                 ],
             )
             
             ai_response = response.text
             
-            # Check if response indicates uncertainty
+            # ตรวจสอบว่า AI ลังเลหรือตอบไม่ได้หรือไม่
             if _is_uncertain_response(ai_response):
-                return ai_response + "\n\nFor more detailed information, please wait for admin support.", True
+                return ai_response + "\n\n(ระบบกำลังประสานงานให้แอดมินมาดูแลเพิ่มเติมครับ)", True
             
             return ai_response, False
         
         except Exception as e:
-            logger.error(f"Gemini API error: {str(e)}")
-            return "I'm having trouble understanding your question right now. An admin will help you shortly.", True
-    
+            logger.error(f"❌ Gemini API Execution error: {str(e)}")
+            return "ขออภัยครับพี่ชาย ระบบประมวลผลขัดข้องชั่วคราว พี่รอแอดมินสักครู่นะครับ", True
+            
     except Exception as e:
-        logger.error(f"Unexpected error in get_gemini_response: {str(e)}")
-        return "An error occurred. Please try again or wait for admin support.", True
+        logger.error(f"❌ Unexpected error in get_gemini_response: {str(e)}")
+        return "เกิดข้อผิดพลาดไม่คาดคิด กรุณาลองใหม่อีกครั้งหรือติดต่อแอดมินครับ", True
 
 
 def _is_uncertain_response(response: str) -> bool:
-    """Check if AI response indicates uncertainty"""
+    """เช็ค Keyword ที่บ่งบอกว่า AI ตอบไม่ได้ เพื่อส่งต่อให้แอดมิน"""
     uncertain_keywords = [
-        "ไม่ทราบ",  # Thai: "don't know"
-        "i don't know",
-        "i'm not sure",
-        "not certain",
-        "unable to",
-        "can't answer",
+        "ไม่ทราบ", 
+        "ไม่แน่ใจ", 
+        "ไม่มีข้อมูล",
+        "i don't know", 
+        "not sure", 
         "beyond my knowledge",
+        "unable to provide",
+        "ขอส่งเรื่องต่อให้แอดมิน",
+        "ติดต่อแอดมิน"
     ]
     
     response_lower = response.lower()
