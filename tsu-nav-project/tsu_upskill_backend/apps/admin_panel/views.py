@@ -10,18 +10,17 @@ from apps.users.serializers import UserSerializer
 from apps.chat.models import PendingAdminQuestion, Message
 from apps.chat.serializers import PendingAdminQuestionSerializer, MessageSerializer
 from apps.locations.models import Location
-from apps.locations.serializers import LocationSerializer
+from .models import SystemAnnouncement  # เพิ่มโมเดลประกาศ
+from .serializers import SystemAnnouncementSerializer # (ต้องสร้างในไฟล์ถัดไป)
 
 class AdminDashboardViewSet(viewsets.ViewSet):
-    """Admin dashboard statistics and management"""
+    """ระบบหลังบ้านสำหรับแอดมิน: ดูสถิติ จัดการผู้ใช้ และตอบคำถาม"""
     permission_classes = [IsAuthenticated]
     
     def list(self, request):
-        """Get admin dashboard stats"""
+        """ดึงข้อมูลสถิติรวมของระบบ TSU UPSKILL"""
         if not request.user.is_admin():
-            return Response({
-                'error': 'Only admins can access dashboard'
-            }, status=status.HTTP_403_FORBIDDEN)
+            return Response({'error': 'สิทธิ์เข้าถึงเฉพาะแอดมินเท่านั้น'}, status=status.HTTP_403_FORBIDDEN)
         
         stats = {
             'total_users': CustomUser.objects.filter(role=CustomUser.STUDENT).count(),
@@ -33,17 +32,15 @@ class AdminDashboardViewSet(viewsets.ViewSet):
                 role=CustomUser.STUDENT,
                 is_email_verified=True
             ).count(),
+            'active_announcements': SystemAnnouncement.objects.filter(is_active=True).count()
         }
-        
         return Response(stats)
     
-    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    @action(detail=False, methods=['get'])
     def users(self, request):
-        """List all users (admin only)"""
+        """รายชื่อนิสิตทั้งหมด พร้อมระบบค้นหา"""
         if not request.user.is_admin():
-            return Response({
-                'error': 'Only admins can view users'
-            }, status=status.HTTP_403_FORBIDDEN)
+            return Response({'error': 'สิทธิ์ไม่ถึงครับพี่ชาย'}, status=status.HTTP_403_FORBIDDEN)
         
         users = CustomUser.objects.filter(role=CustomUser.STUDENT)
         search = request.query_params.get('search')
@@ -56,29 +53,12 @@ class AdminDashboardViewSet(viewsets.ViewSet):
         
         serializer = UserSerializer(users, many=True)
         return Response(serializer.data)
-    
-    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
-    def pending_questions(self, request):
-        """Get all pending admin questions"""
-        if not request.user.is_admin():
-            return Response({
-                'error': 'Only admins can view pending questions'
-            }, status=status.HTTP_403_FORBIDDEN)
-        
-        pending = PendingAdminQuestion.objects.filter(
-            status=PendingAdminQuestion.STATUS_PENDING
-        ).order_by('created_at')
-        
-        serializer = PendingAdminQuestionSerializer(pending, many=True)
-        return Response(serializer.data)
-    
-    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
+
+    @action(detail=False, methods=['post'])
     def respond_to_question(self, request):
-        """Admin responds to a pending question"""
+        """แอดมินตอบคำถามนิสิต และปิดสถานะ Pending"""
         if not request.user.is_admin():
-            return Response({
-                'error': 'Only admins can respond'
-            }, status=status.HTTP_403_FORBIDDEN)
+            return Response({'error': 'เฉพาะแอดมิน James เท่านั้นที่ตอบได้'}, status=status.HTTP_403_FORBIDDEN)
         
         question_id = request.data.get('question_id')
         response_content = request.data.get('response')
@@ -86,48 +66,34 @@ class AdminDashboardViewSet(viewsets.ViewSet):
         try:
             pending = PendingAdminQuestion.objects.get(pk=question_id)
             
-            # Create admin response
-            admin_msg = Message.objects.create(
+            # สร้างข้อความตอบกลับจากแอดมิน
+            Message.objects.create(
                 session=pending.message.session,
                 sender=Message.SENDER_ADMIN,
                 content=response_content,
                 admin_user=request.user
             )
             
-            # Mark as answered
+            # อัปเดตสถานะคำถาม
             pending.status = PendingAdminQuestion.STATUS_ANSWERED
             pending.answered_at = timezone.now()
             pending.save()
             
-            return Response({
-                'success': True,
-                'message': 'Response sent successfully'
-            }, status=status.HTTP_200_OK)
-        
+            return Response({'success': True, 'message': 'ส่งคำตอบเรียบร้อยแล้ว'}, status=status.HTTP_200_OK)
         except PendingAdminQuestion.DoesNotExist:
-            return Response({
-                'error': 'Question not found'
-            }, status=status.HTTP_404_NOT_FOUND)
-    
-    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
-    def activity_log(self, request):
-        """Get recent activity log"""
-        if not request.user.is_admin():
-            return Response({
-                'error': 'Only admins can view activity log'
-            }, status=status.HTTP_403_FORBIDDEN)
-        
-        recent_messages = Message.objects.select_related(
-            'session__user'
-        ).order_by('-created_at')[:50]
-        
-        activity = []
-        for msg in recent_messages:
-            activity.append({
-                'user': msg.session.user.student_id,
-                'action': f'Message from {msg.sender}',
-                'timestamp': msg.created_at,
-                'content': msg.content[:100]
-            })
-        
-        return Response(activity)
+            return Response({'error': 'ไม่พบคำถามนี้ในระบบ'}, status=status.HTTP_404_NOT_FOUND)
+
+class AnnouncementViewSet(viewsets.ModelViewSet):
+    """จัดการประกาศข่าวสาร (CRUD)"""
+    queryset = SystemAnnouncement.objects.all()
+    serializer_class = SystemAnnouncementSerializer
+    permission_classes = [IsAuthenticated]
+
+    def perform_create(self, serializer):
+        serializer.save(author=self.request.user)
+
+    def get_queryset(self):
+        # ถ้านิสิตดู จะเห็นแค่ที่เปิดใช้งานอยู่ ถ้าแอดมินจะเห็นทั้งหมด
+        if self.request.user.is_admin():
+            return SystemAnnouncement.objects.all()
+        return SystemAnnouncement.objects.filter(is_active=True)
