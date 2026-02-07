@@ -3,26 +3,25 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.utils import timezone
-from django.db import transaction # เพิ่มการใช้ Transaction เพื่อความปลอดภัยของข้อมูล
+from django.db import transaction
 
 from .models import ChatSession, Message, PendingAdminQuestion
 from .serializers import (
     ChatSessionSerializer, MessageSerializer,
     SendMessageSerializer, PendingAdminQuestionSerializer
 )
-from utils.gemini_service import get_gemini_response
+# แก้ไขบรรทัดนี้ให้ชี้ไปที่โฟลเดอร์ services ในแอป chat
+from .services.gemini_service import get_gemini_response
 
 class ChatSessionViewSet(viewsets.ModelViewSet):
-    """ระบบจัดการ Session การแชทสำหรับนิสิต"""
+    """ระบบจัดการ Session การแชทสำหรับนิสิต TSU UPSKILL"""
     serializer_class = ChatSessionSerializer
     permission_classes = [IsAuthenticated]
     
     def get_queryset(self):
-        # ดึงเฉพาะแชทของตัวเอง และเอาข้อความล่าสุดขึ้นก่อน
         return ChatSession.objects.filter(user=self.request.user).order_by('-updated_at')
     
     def perform_create(self, serializer):
-        # บันทึก User ลงใน Session โดยอัตโนมัติ
         serializer.save(user=self.request.user)
     
     @action(detail=True, methods=['post'])
@@ -36,7 +35,6 @@ class ChatSessionViewSet(viewsets.ModelViewSet):
 
         user_content = serializer.validated_data['content']
 
-        # ใช้ transaction.atomic เพื่อให้มั่นใจว่าถ้าบันทึกพลาด จะไม่บันทึกอะไรเลย
         with transaction.atomic():
             # 1. บันทึกข้อความนิสิต
             user_msg = Message.objects.create(
@@ -45,7 +43,7 @@ class ChatSessionViewSet(viewsets.ModelViewSet):
                 content=user_content
             )
             
-            # 2. เรียกใช้ Gemini (ส่งข้อมูล Session ไปด้วยเพื่อให้ AI จำบริบทเก่าได้)
+            # 2. เรียกใช้ Gemini (ส่ง Session ไปให้ AI จำประวัติได้)
             ai_response, is_fallback = get_gemini_response(user_content, session)
             
             # 3. บันทึกข้อความจาก AI
@@ -56,12 +54,12 @@ class ChatSessionViewSet(viewsets.ModelViewSet):
                 is_fallback_to_admin=is_fallback
             )
             
-            # 4. ถ้า AI ตอบไม่ได้ ให้สร้างตั๋วรอแอดมิน James
+            # 4. ถ้า AI ตอบไม่ได้ ให้ส่งเรื่องต่อให้แอดมิน
             if is_fallback:
                 PendingAdminQuestion.objects.get_or_create(message=ai_msg)
             
-            # 5. อัปเดตชื่อ Session ถ้าเป็นข้อความแรกของแชท
-            if session.messages.count() <= 2: # user + ai message
+            # 5. ตั้งชื่อแชทให้อัตโนมัติจากข้อความแรก
+            if session.messages.count() <= 2:
                 session.title = user_content[:50]
                 session.save()
 
@@ -73,11 +71,12 @@ class ChatSessionViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['get'])
     def messages(self, request, pk=None):
-        """ดึงประวัติข้อความทั้งหมดในแชทนี้"""
         session = self.get_object()
         messages = session.messages.all().order_by('created_at')
         serializer = MessageSerializer(messages, many=True)
         return Response(serializer.data)
+
+# ... ส่วนที่เหลือ (PendingAdminQuestionViewSet) ใช้โค้ดเดิมของพี่ได้เลยครับ ...
 
 
 class PendingAdminQuestionViewSet(viewsets.ViewSet):
@@ -127,3 +126,4 @@ class PendingAdminQuestionViewSet(viewsets.ViewSet):
             
         except PendingAdminQuestion.DoesNotExist:
             return Response({'error': 'ไม่พบรายการนี้'}, status=status.HTTP_404_NOT_FOUND)
+
