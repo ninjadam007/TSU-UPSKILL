@@ -2,34 +2,67 @@
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <title>TSU Upskill</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TSU Upskill | API Gateway</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
-            background: #0f172a;
-            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: radial-gradient(circle at top right, #1e293b, #0f172a);
+            color: #f8fafc;
             display: flex;
             justify-content: center;
             align-items: center;
             height: 100vh;
+            margin: 0;
         }
         .box {
-            background: #020617;
-            padding: 40px;
-            border-radius: 12px;
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(10px); /* เอฟเฟกต์กระจกฝ้า */
+            padding: 50px;
+            border-radius: 20px;
             text-align: center;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: transform 0.3s ease;
         }
-        a {
-            color: #38bdf8;
+        .box:hover {
+            transform: translateY(-5px);
+        }
+        h1 {
+            margin-bottom: 10px;
+            background: linear-gradient(to right, #38bdf8, #818cf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-size: 2.5rem;
+        }
+        .status {
+            color: #10b981; /* สีเขียว Success */
+            font-weight: bold;
+            display: block;
+            margin-bottom: 25px;
+        }
+        .btn-admin {
+            display: inline-block;
+            background: #38bdf8;
+            color: #0f172a;
+            padding: 12px 25px;
+            border-radius: 8px;
             text-decoration: none;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+        .btn-admin:hover {
+            background: #7dd3fc;
         }
     </style>
 </head>
 <body>
     <div class="box">
         <h1>TSU Upskill Platform</h1>
-        <p>ระบบพร้อมใช้งานแล้ว ✅</p>
-        <p><a href="/admin/">เข้าสู่ Admin Panel</a></p>
+        <span class="status">✅ ระบบ Backend พร้อมให้บริการ</span>
+        <p style="color: #94a3b8; font-size: 0.9rem;">มหาวิทยาลัยทักษิณ | พัทลุง - สงขลา</p>
+        <br>
+        <a href="/admin/" class="btn-admin">เข้าสู่ระบบจัดการ (Admin Panel)</a>
     </div>
 </body>
 </html>
