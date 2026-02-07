@@ -1,41 +1,73 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+// แนะนำให้ใช้ react-router-dom สำหรับการเปลี่ยนหน้า
+// import { useNavigate } from 'react-router-dom'; 
 
 const TSUApp = () => {
-  const [darkMode, setDarkMode] = useState(false);
+  const [darkMode, setDarkMode] = useState(() => {
+    // ดึงค่า Theme เดิมที่ User เคยเลือกไว้จากเครื่อง
+    return localStorage.getItem('theme') === 'dark';
+  });
+
+  // เก็บค่า Theme ลงเครื่องทุกครั้งที่เปลี่ยน
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
+  }, [darkMode]);
 
   return (
-    <div className={`${darkMode ? 'dark' : ''}`}>
-      {/* ส่วนของพื้นหลังที่เปลี่ยนตามโหมด */}
-      <div className="min-h-screen transition-colors duration-500 bg-tsu-light dark:bg-tsu-dark text-gray-900 dark:text-white">
+    <div className={`${darkMode ? 'dark' : ''} font-sans`}>
+      <div className="min-h-screen transition-colors duration-500 bg-slate-50 dark:bg-slate-900 text-gray-900 dark:text-gray-100">
         
         {/* Navigation Bar */}
-        <nav className="p-4 flex justify-between items-center border-b border-tsu-blue dark:border-tsu-orange">
-          <h1 className="text-2xl font-bold text-tsu-blue dark:text-tsu-orange">TSU UPSKILL</h1>
+        <nav className="p-4 flex justify-between items-center backdrop-blur-md sticky top-0 z-50 border-b border-blue-600/20 dark:border-orange-500/20 bg-white/70 dark:bg-slate-900/70">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold">T</div>
+            <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-500 dark:from-orange-500 dark:to-yellow-500">
+              TSU UPSKILL
+            </h1>
+          </div>
+          
           <button 
             onClick={() => setDarkMode(!darkMode)}
-            className="p-2 rounded-full bg-tsu-blue text-white dark:bg-tsu-orange"
+            className="p-2.5 rounded-xl bg-slate-200 dark:bg-slate-800 hover:scale-110 transition-transform"
           >
-            {darkMode ? '🌙 Dark Mode' : '☀️ Light Mode'}
+            {darkMode ? '🌙' : '☀️'}
           </button>
         </nav>
 
         {/* Main Content */}
-        <main className="p-8 grid md:grid-cols-2 gap-8">
-          
-          {/* Card: Campus Map (ตามที่ไกด์บอก) */}
-          <div className="p-6 rounded-2xl shadow-lg bg-white dark:bg-gray-800 border-l-8 border-tsu-blue">
-            <h2 className="text-xl font-semibold mb-4">📍 Campus Navigation</h2>
-            <p>ค้นหาอาคารเรียน พิกัด GPS และห้องเรียนที่คุณต้องการ</p>
-            <button className="mt-4 px-4 py-2 bg-tsu-blue text-white rounded-lg hover:bg-opacity-80">เปิดแผนที่</button>
-          </div>
+        <main className="max-w-6xl mx-auto p-8">
+          <header className="mb-12 text-center md:text-left">
+            <h2 className="text-4xl font-extrabold mb-4">ยินดีต้อนรับสู่ <span className="text-blue-600 dark:text-orange-500">UPSKILL</span></h2>
+            <p className="text-gray-500 dark:text-gray-400">ยกระดับชีวิตการเรียนในรั้วมหาวิทยาลัยทักษิณด้วย AI และระบบนำทางอัจฉริยะ</p>
+          </header>
 
-          {/* Card: AI Chatbot (เชื่อมกับ Gemini) */}
-          <div className="p-6 rounded-2xl shadow-lg bg-white dark:bg-gray-800 border-l-8 border-tsu-orange">
-            <h2 className="text-xl font-semibold mb-4">🤖 TSU AI Assistant</h2>
-            <p>สอบถามข้อมูลมหาวิทยาลัยกับ AI อัจฉริยะ (Gemini Powered)</p>
-            <button className="mt-4 px-4 py-2 bg-tsu-orange text-white rounded-lg hover:bg-opacity-80">เริ่มแชท</button>
-          </div>
+          <div className="grid md:grid-cols-2 gap-8">
+            {/* Card: Campus Map */}
+            <div className="group p-8 rounded-3xl shadow-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-blue-500 transition-all duration-300 hover:-translate-y-2">
+              <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-2xl flex items-center justify-center text-2xl mb-6">📍</div>
+              <h2 className="text-2xl font-bold mb-3">Campus Navigation</h2>
+              <p className="text-gray-600 dark:text-gray-400 mb-6 leading-relaxed">ค้นหาอาคารเรียน พิกัด GPS และห้องเรียนที่คุณต้องการ ไม่หลงทางแน่นอน</p>
+              <button className="w-full py-3 bg-blue-600 text-white rounded-xl font-semibold shadow-lg shadow-blue-600/30 hover:bg-blue-700 transition-colors">
+                เปิดแผนที่นำทาง
+              </button>
+            </div>
 
+            {/* Card: AI Chatbot */}
+            <div className="group p-8 rounded-3xl shadow-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-orange-500 transition-all duration-300 hover:-translate-y-2">
+              <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900/30 rounded-2xl flex items-center justify-center text-2xl mb-6">🤖</div>
+              <h2 className="text-2xl font-bold mb-3">TSU AI Assistant</h2>
+              <p className="text-gray-600 dark:text-gray-400 mb-6 leading-relaxed">สอบถามข้อมูลมหาวิทยาลัย การลงทะเบียน หรือเรื่องทั่วไปกับ Gemini AI</p>
+              <button className="w-full py-3 bg-orange-500 text-white rounded-xl font-semibold shadow-lg shadow-orange-500/30 hover:bg-orange-600 transition-colors">
+                เริ่มแชทถาม AI
+              </button>
+            </div>
+          </div>
         </main>
       </div>
     </div>
