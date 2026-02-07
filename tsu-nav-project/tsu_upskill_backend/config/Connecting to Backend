@@ -1,12 +1,38 @@
+// แนะนำให้ดึง API_URL จาก environment variable เพื่อความสะดวกตอนเปลี่ยน Server
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api/users/auth';
+
 const login = async (studentId, password) => {
-  const response = await fetch('http://localhost:8000/api/auth/login/', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ student_id: studentId, password: password })
-  });
-  const data = await response.json();
-  if (data.access) {
-    localStorage.setItem('token', data.access); // เก็บ Token ไว้ใช้ต่อ
-    alert('เข้าสู่ระบบสำเร็จ!');
+  try {
+    const response = await fetch(`${API_BASE_URL}/login/`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json' 
+      },
+      body: JSON.stringify({ 
+        student_id: studentId, 
+        password: password 
+      })
+    });
+
+    const data = await response.json();
+
+    if (response.ok && data.access) {
+      // 1. เก็บทั้ง Access และ Refresh Token
+      localStorage.setItem('access_token', data.access);
+      localStorage.setItem('refresh_token', data.refresh);
+      
+      // 2. เก็บข้อมูล Profile เบื้องต้น (เพื่อไม่ต้องเรียก API บ่อยๆ)
+      localStorage.setItem('user_profile', JSON.stringify(data.user));
+
+      alert('เข้าสู่ระบบสำเร็จ! ยินดีต้อนรับชาว TSU');
+      return data;
+    } else {
+      // แสดง Error Message จาก Backend (ที่เราเขียนไว้ใน Serializer)
+      alert(data.message || 'รหัสนิสิตหรือรหัสผ่านไม่ถูกต้อง');
+      return null;
+    }
+  } catch (error) {
+    console.error('Login Error:', error);
+    alert('ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้');
   }
 };
