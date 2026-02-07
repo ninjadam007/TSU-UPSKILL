@@ -4,18 +4,15 @@ from pathlib import Path
 from decouple import config
 from datetime import timedelta
 
-# Build paths inside the project
+# 1. การตั้งค่าเส้นทางหลัก
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# SECURITY: Secret key should be strong and kept in environment variable
-SECRET_KEY = config('SECRET_KEY', default='django-insecure-change-this-in-production')
-
-# SECURITY: Debug should be False in production
-DEBUG = config('DEBUG', default=False, cast=bool)
-
+# 2. ความปลอดภัยพื้นฐาน (ดึงจากไฟล์ .env)
+SECRET_KEY = config('SECRET_KEY', default='django-insecure-tsu-upskill-change-this')
+DEBUG = config('DEBUG', default=True, cast=bool)
 ALLOWED_HOSTS = config('DJANGO_ALLOWED_HOSTS', default='localhost,127.0.0.1,tsu-upskill.onrender.com').split(',')
 
-# Application definition
+# 3. รายชื่อแอปพลิเคชัน
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -27,20 +24,19 @@ INSTALLED_APPS = [
     # Third party apps
     'rest_framework',
     'corsheaders',
-    'celery',
     
-    # Local apps
+    # Local apps (ใส่ชื่อแอปให้ตรงกับที่ลงทะเบียนใน apps.py)
     'apps.users',
     'apps.locations',
     'apps.chat',
-    'apps.admin_panel',
 ]
 
+# 4. ลำดับ Middleware (การประมวลผลคำขอ)
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware', # สำหรับจัดการไฟล์ static ใน production
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'corsheaders.middleware.CorsMiddleware',
+    'corsheaders.middleware.CorsMiddleware', # ต้องอยู่เหนือ CommonMiddleware
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -50,13 +46,11 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'config.urls'
 
-from pathlib import Path
-BASE_DIR = Path(__file__).resolve().parent.parent
-
+# 5. การจัดการหน้าตา (Templates)
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / 'templates'],
+        'DIRS': [BASE_DIR / 'templates'], # เก็บไฟล์ index.html ไว้ที่นี่
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -69,10 +63,10 @@ TEMPLATES = [
     },
 ]
 
-
 WSGI_APPLICATION = 'config.wsgi.application'
 
-# --- Database Configuration ---
+# 6. การตั้งค่าฐานข้อมูล
+# ถ้าอยู่บน Render.com จะใช้ DATABASE_URL อัตโนมัติ ถ้าไม่มีจะใช้ SQLite/Postgres ท้องถิ่น
 if config('DATABASE_URL', default=None):
     DATABASES = {
         'default': dj_database_url.config(
@@ -84,21 +78,16 @@ if config('DATABASE_URL', default=None):
 else:
     DATABASES = {
         'default': {
-            'ENGINE': config('DB_ENGINE', default='django.db.backends.postgresql'),
-            'NAME': config('DB_NAME', default='tsu_upskill'),
-            'USER': config('DB_USER', default='postgres'),
-            'PASSWORD': config('DB_PASSWORD', default=''),
-            'HOST': config('DB_HOST', default='localhost'),
-            'PORT': config('DB_PORT', default='5432'),
-            'CONN_MAX_AGE': 600,
-            'ATOMIC_REQUESTS': True,
+            'ENGINE': config('DB_ENGINE', default='django.db.backends.sqlite3'),
+            'NAME': BASE_DIR / config('DB_NAME', default='db.sqlite3'),
         }
     }
 
-# User Model Configuration
+# 7. โมเดลผู้ใช้ (สำคัญมาก!)
+# ชี้ไปที่ CustomUser ที่เราเขียนไว้ในแอป users
 AUTH_USER_MODEL = 'users.CustomUser'
 
-# Password validation
+# 8. การตรวจสอบรหัสผ่าน
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
     {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator', 'OPTIONS': {'min_length': 8}},
@@ -106,13 +95,13 @@ AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
-# Internationalization
+# 9. ภาษาและเวลา (ภาษาไทย)
 LANGUAGE_CODE = 'th-th'
 TIME_ZONE = 'Asia/Bangkok'
 USE_I18N = True
 USE_TZ = True
 
-# Static and Media files
+# 10. ไฟล์ Static และ Media
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
@@ -122,7 +111,7 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# REST Framework Configuration
+# 11. Django Rest Framework & JWT
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework_simplejwt.authentication.JWTAuthentication',
@@ -132,88 +121,34 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
-    'DEFAULT_FILTER_BACKENDS': [
-        'rest_framework.filters.SearchFilter',
-        'rest_framework.filters.OrderingFilter',
-    ],
-    'DEFAULT_THROTTLE_CLASSES': [],
-    'DEFAULT_THROTTLE_RATES': {
-        'anon': '100/hour',
-        'user': '1000/hour',
-    },
 }
 
-# CORS Configuration
-CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', default='http://localhost:3000').split(',')
-CORS_ALLOW_CREDENTIALS = True
-
-# JWT Configuration
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(hours=config('JWT_EXPIRATION_HOURS', default=24, cast=int)),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     'ROTATE_REFRESH_TOKENS': True,
-    'BLACKLIST_AFTER_ROTATION': False,
     'ALGORITHM': 'HS256',
-    'SIGNING_KEY': config('JWT_SECRET', default=SECRET_KEY),
+    'SIGNING_KEY': SECRET_KEY,
 }
 
-# --- จุดที่ 1: Google Gemini API (ดึงค่าจาก Environment) ---
+# 12. CORS (อนุญาตให้หน้าบ้านเชื่อมต่อ)
+CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', default='http://localhost:3000').split(',')
+CORS_ALLOW_CREDENTIALS = True
+
+# 13. บริการภายนอก (Gemini & Email)
 GEMINI_API_KEY = config('GEMINI_API_KEY', default='')
 
-# --- จุดที่ 2: Email Configuration (ปรับจาก console เป็น smtp ตาม Guide) ---
-# ใช้ smtp เพื่อให้ส่งเมลยืนยันตัวตนได้จริง
-EMAIL_BACKEND = config('EMAIL_BACKEND', default='django.core.mail.backends.smtp.EmailBackend')
-EMAIL_HOST = config('EMAIL_HOST', default='smtp.gmail.com')
-EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
-EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
 EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
-EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='') # App Password จาก Google
+EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='') # App Password 16 หลัก
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
-# Celery Configuration
-CELERY_BROKER_URL = config('CELERY_BROKER_URL', default='redis://localhost:6379')
-CELERY_RESULT_BACKEND = config('CELERY_RESULT_BACKEND', default='redis://localhost:6379')
-CELERY_ACCEPT_CONTENT = ['json']
-CELERY_TASK_SERIALIZER = 'json'
-
-# --- Cache Configuration ---
-CACHES = {
-    'default': {
-        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-    }
-}
-
-# Logging Configuration
-LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'formatters': {
-        'verbose': {
-            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
-            'style': '{',
-        },
-    },
-    'handlers': {
-        'console': {
-            'level': 'INFO',
-            'class': 'logging.StreamHandler',
-            'formatter': 'verbose',
-        },
-    },
-    'root': {
-        'handlers': ['console'],
-        'level': 'INFO',
-    },
-}
-
-# Security Settings
+# 14. ความปลอดภัยเมื่อขึ้นระบบจริง (Production)
 if not DEBUG:
     SECURE_SSL_REDIRECT = True
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-
-CSRF_COOKIE_HTTPONLY = True
-SESSION_COOKIE_HTTPONLY = True
-X_FRAME_OPTIONS = 'DENY'
-
