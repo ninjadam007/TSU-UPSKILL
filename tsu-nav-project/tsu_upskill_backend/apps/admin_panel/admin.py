@@ -1,17 +1,17 @@
 from django.contrib import admin
-from django.contrib.auth.models import Group
+from .models import Message, PendingAdminQuestion
 
-# ตั้งค่าหัวข้อหน้า Admin ให้เป็นชื่อโครงการ TSU UPSKILL
-admin.site.site_header = "TSU UPSKILL Management System"
-admin.site.site_title = "TSU Admin Portal"
-admin.site.index_title = "ยินดีต้อนรับคุณ James (Admin)"
+@admin.register(Message)
+class MessageAdmin(admin.ModelAdmin):
+    # แก้ (E108): เอา 'get_user' ออก แล้วใช้ 'sender' หรือ 'content' แทน
+    list_display = ('id', 'sender', 'content', 'created_at')
+    list_filter = ('sender', 'created_at')
 
-# โดยปกติแอป admin_panel จะเป็นตัวรวบรวมสถิติ 
-# เราจะใช้ไฟล์นี้ในการปรับแต่งหน้าแรกของ Django Admin
-# และจัดการสิทธิ์การเข้าถึง (Permissions) ต่างๆ ในอนาคต
-
-# ตัวอย่าง: การซ่อน Group (ถ้าไม่ต้องการให้แอดมินทั่วไปแก้สิทธิ์)
-# admin.site.unregister(Group)
-
-# หมายเหตุ: สำหรับ Model หลักๆ เช่น Chat หรือ User 
-# เราจะไปลงทะเบียนที่ admin.py ของแอปนั้นๆ เพื่อความเป็นระเบียบครับ
+@admin.register(PendingAdminQuestion)
+class PendingAdminQuestionAdmin(admin.ModelAdmin):
+    # แก้ (E108) และ (E122):
+    # 1. เอา 'get_user' ออก
+    # 2. ต้องมี 'status' ใน list_display ถึงจะใช้ใน list_editable ได้
+    list_display = ('id', 'status', 'created_at', 'answered_at')
+    list_editable = ('status',) 
+    list_filter = ('status', 'created_at')
