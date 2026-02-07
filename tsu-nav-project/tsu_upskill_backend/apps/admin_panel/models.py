@@ -9,7 +9,7 @@ class SystemAnnouncement(models.Model):
     is_active = models.BooleanField(default=True, verbose_name="กำลังใช้งาน")
     author = models.ForeignKey(
         settings.AUTH_USER_MODEL, 
-        on_ Harris=models.CASCADE, 
+        on_delete=models.CASCADE,  # ✅ แก้ไขจาก on_ Harris เป็น on_delete
         verbose_name="ผู้ประกาศ"
     )
 
