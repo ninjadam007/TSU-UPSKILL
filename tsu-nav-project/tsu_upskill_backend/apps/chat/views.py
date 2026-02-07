@@ -10,8 +10,9 @@ from .serializers import (
     ChatSessionSerializer, MessageSerializer,
     SendMessageSerializer, PendingAdminQuestionSerializer
 )
-# แก้ไขบรรทัดนี้ให้ชี้ไปที่โฟลเดอร์ services ในแอป chat
-from .services.gemini_service import get_gemini_response
+
+# ✅ แก้ไข: ชี้ไปที่โฟลเดอร์ utils นอกแอปตามโครงสร้างจริงของพี่ James
+from utils.gemini_service import get_gemini_response
 
 class ChatSessionViewSet(viewsets.ModelViewSet):
     """ระบบจัดการ Session การแชทสำหรับนิสิต TSU UPSKILL"""
@@ -43,7 +44,7 @@ class ChatSessionViewSet(viewsets.ModelViewSet):
                 content=user_content
             )
             
-            # 2. เรียกใช้ Gemini (ส่ง Session ไปให้ AI จำประวัติได้)
+            # 2. เรียกใช้ Gemini จาก utils
             ai_response, is_fallback = get_gemini_response(user_content, session)
             
             # 3. บันทึกข้อความจาก AI
@@ -76,15 +77,14 @@ class ChatSessionViewSet(viewsets.ModelViewSet):
         serializer = MessageSerializer(messages, many=True)
         return Response(serializer.data)
 
-# ... ส่วนที่เหลือ (PendingAdminQuestionViewSet) ใช้โค้ดเดิมของพี่ได้เลยครับ ...
-
 
 class PendingAdminQuestionViewSet(viewsets.ViewSet):
     """ส่วนของแอดมินสำหรับจัดการคำถามที่ AI ตอบไม่ได้"""
     permission_classes = [IsAuthenticated]
     
     def list(self, request):
-        if not request.user.is_admin():
+        # ตรวจสอบว่าเป็น Admin หรือ Staff
+        if not (request.user.is_staff or (hasattr(request.user, 'is_admin') and request.user.is_admin())):
             return Response({'error': 'เฉพาะแอดมินเท่านั้นครับ'}, status=status.HTTP_403_FORBIDDEN)
         
         pending = PendingAdminQuestion.objects.filter(
@@ -96,7 +96,7 @@ class PendingAdminQuestionViewSet(viewsets.ViewSet):
     @action(detail=True, methods=['post'])
     def respond(self, request, pk=None):
         """แอดมินพิมพ์ตอบคำถาม"""
-        if not request.user.is_admin():
+        if not (request.user.is_staff or (hasattr(request.user, 'is_admin') and request.user.is_admin())):
             return Response({'error': 'สิทธิ์ไม่เพียงพอ'}, status=status.HTTP_403_FORBIDDEN)
         
         try:
@@ -107,14 +107,12 @@ class PendingAdminQuestionViewSet(viewsets.ViewSet):
                 return Response({'error': 'กรุณาใส่ข้อความตอบกลับ'}, status=status.HTTP_400_BAD_REQUEST)
 
             with transaction.atomic():
-                # สร้างข้อความแอดมิน
                 admin_msg = Message.objects.create(
                     session=pending.message.session,
                     sender=Message.SENDER_ADMIN,
                     content=response_content,
                     admin_user=request.user
                 )
-                # ปิดสถานะคำถาม
                 pending.status = PendingAdminQuestion.STATUS_ANSWERED
                 pending.answered_at = timezone.now()
                 pending.save()
@@ -126,4 +124,3 @@ class PendingAdminQuestionViewSet(viewsets.ViewSet):
             
         except PendingAdminQuestion.DoesNotExist:
             return Response({'error': 'ไม่พบรายการนี้'}, status=status.HTTP_404_NOT_FOUND)
-
