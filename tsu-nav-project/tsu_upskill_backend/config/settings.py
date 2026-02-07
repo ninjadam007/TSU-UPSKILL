@@ -9,11 +9,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # 2. ความปลอดภัยพื้นฐาน
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-tsu-upskill-change-this')
-# แนะนำ: ตั้ง DEBUG=True ใน Render Environment ชั่วคราวเพื่อดู Error ที่ละเอียดขึ้น
 DEBUG = config('DEBUG', default=True, cast=bool)
 ALLOWED_HOSTS = config('DJANGO_ALLOWED_HOSTS', default='localhost,127.0.0.1,.onrender.com').split(',')
 
-# 3. รายชื่อแอปพลิเคชัน (ตัด Celery ออกเพื่อประหยัด RAM)
+# 3. รายชื่อแอปพลิเคชัน
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -30,6 +29,7 @@ INSTALLED_APPS = [
     'apps.users',
     'apps.locations',
     'apps.chat',
+    'apps.admin_panel',  # ✅ เพิ่มเข้าไปเพื่อให้รู้จักโมเดล SystemAnnouncement
 ]
 
 # 4. ลำดับ Middleware
@@ -83,8 +83,9 @@ else:
         }
     }
 
-# 7. โมเดลผู้ใช้ (เช็คชื่อแอปและชื่อ Class ให้ตรง)
-AUTH_USER_MODEL = 'users.CustomUser'
+# 7. โมเดลผู้ใช้ 
+# ✅ ตรวจสอบ: ถ้าแอปชื่อ apps.users ต้องระบุแค่ชื่อแอปที่ register ใน AppConfig
+AUTH_USER_MODEL = 'users.CustomUser' 
 
 # 8. การตรวจสอบรหัสผ่าน
 AUTH_PASSWORD_VALIDATORS = [
@@ -100,7 +101,7 @@ TIME_ZONE = 'Asia/Bangkok'
 USE_I18N = True
 USE_TZ = True
 
-# 10. ไฟล์ Static และ Media (ใช้ WhiteNoise)
+# 10. ไฟล์ Static และ Media
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
