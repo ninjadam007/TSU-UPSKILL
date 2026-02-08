@@ -1,6 +1,5 @@
 from django.contrib import admin
 from django.utils.html import format_html
-from django.urls import reverse
 from .models import ChatSession, Message, PendingAdminQuestion
 
 @admin.register(ChatSession)
@@ -51,7 +50,7 @@ class MessageAdmin(admin.ModelAdmin):
     def is_fallback_badge(self, obj):
         if obj.is_fallback_to_admin:
             return format_html('<span style="color: #f5222d;">⚠️ รอแอดมิน</span>')
-        return format_html('<span style="color: #52c41a;">✓</span>')
+        return format_html('<span style="color: #52c41a;">✓ เรียบร้อย</span>')
     is_fallback_badge.short_description = 'สถานะ'
 
 @admin.register(PendingAdminQuestion)
@@ -71,6 +70,6 @@ class PendingAdminQuestionAdmin(admin.ModelAdmin):
 
     def status_badge(self, obj):
         color = "#faad14" if obj.status == 'pending' else "#52c41a"
-        label = "รอตอบ" if obj.status == 'pending' else "เสร็จสิ้น"
+        label = "⏳ รอตอบ" if obj.status == 'pending' else "✅ ตอบแล้ว"
         return format_html('<b style="color: {};">{}</b>', color, label)
     status_badge.short_description = 'Badge'
