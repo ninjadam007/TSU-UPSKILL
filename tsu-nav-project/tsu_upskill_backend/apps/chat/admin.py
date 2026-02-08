@@ -1,4 +1,4 @@
-from django.contrib import admin
+from django.contrifrom django.contrib import admin
 from django.utils.html import format_html
 from django.urls import reverse
 from .models import ChatSession, Message, PendingAdminQuestion
@@ -28,19 +28,18 @@ class ChatSessionAdmin(admin.ModelAdmin):
 
 @admin.register(Message)
 class MessageAdmin(admin.ModelAdmin):
-    # แก้ (admin.E108): ตอนนี้มีฟังก์ชัน get_user รองรับแล้ว
     list_display = ('get_user', 'sender_style', 'content_preview', 'is_fallback_badge', 'created_at')
     list_filter = ('sender', 'is_fallback_to_admin', 'created_at')
     search_fields = ('session__user__student_id', 'content')
     readonly_fields = ('created_at',)
 
-    # ฟังก์ชันที่ Django มองหา (E108)
     def get_user(self, obj):
         return obj.session.user.student_id
     get_user.short_description = 'นิสิต'
 
     def content_preview(self, obj):
-        return format_html('<span title="{}">{}</span>', obj.content, (obj.content[:40] + '...') if len(obj.content) > 40 else obj.content)
+        content = obj.content[:40] + '...' if len(obj.content) > 40 else obj.content
+        return format_html('<span title="{}">{}</span>', obj.content, content)
     content_preview.short_description = 'เนื้อหา'
 
     def sender_style(self, obj):
@@ -50,5 +49,29 @@ class MessageAdmin(admin.ModelAdmin):
     sender_style.short_description = 'ผู้ส่ง'
 
     def is_fallback_badge(self, obj):
+        # ✅ แก้ไข Syntax ตรงนี้ให้เขียนบรรทัดเดียวป้องกัน Error ครับ
         if obj.is_fallback_to_admin:
-            return format_html('<span style="color: #f5222d;">⚠️
+            return format_html('<span style="color: #f5222d;">⚠️ รอแอดมิน</span>')
+        return format_html('<span style="color: #52c41a;">✓</span>')
+    is_fallback_badge.short_description = 'สถานะ'
+
+@admin.register(PendingAdminQuestion)
+class PendingAdminQuestionAdmin(admin.ModelAdmin):
+    list_display = ('get_user', 'question_text', 'status', 'status_badge', 'created_at')
+    list_filter = ('status', 'created_at')
+    list_editable = ('status',)
+    search_fields = ('message__session__user__student_id',)
+
+    def get_user(self, obj):
+        return obj.message.session.user.student_id
+    get_user.short_description = 'นิสิต'
+
+    def question_text(self, obj):
+        return obj.message.content
+    question_text.short_description = 'คำถาม'
+
+    def status_badge(self, obj):
+        color = "#faad14" if obj.status == 'pending' else "#52c41a"
+        label = "รอตอบ" if obj.status == 'pending' else "เสร็จสิ้น"
+        return format_html('<b style="color: {};">{}</b>', color, label)
+    status_badge.short_description = 'Badge'
