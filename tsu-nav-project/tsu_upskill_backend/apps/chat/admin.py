@@ -1,4 +1,4 @@
-from django.contrifrom django.contrib import admin
+from django.contrib import admin
 from django.utils.html import format_html
 from django.urls import reverse
 from .models import ChatSession, Message, PendingAdminQuestion
@@ -49,7 +49,6 @@ class MessageAdmin(admin.ModelAdmin):
     sender_style.short_description = 'ผู้ส่ง'
 
     def is_fallback_badge(self, obj):
-        # ✅ แก้ไข Syntax ตรงนี้ให้เขียนบรรทัดเดียวป้องกัน Error ครับ
         if obj.is_fallback_to_admin:
             return format_html('<span style="color: #f5222d;">⚠️ รอแอดมิน</span>')
         return format_html('<span style="color: #52c41a;">✓</span>')
