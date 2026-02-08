@@ -4,14 +4,15 @@ class UsersConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'apps.users'
     
-    # ปรับชื่อให้แสดงในหน้า Admin เป็นภาษาไทยที่ดูเป็นทางการ
-    # ช่วยให้แอดมิน James แยกโซนจัดการ "คน" ออกจากโซน "แชท" ได้ง่ายขึ้น
+    # ✅ เพิ่มบรรทัดนี้ เพื่อให้ Django อ้างอิงแอปนี้ด้วยคำว่า 'users' ได้อย่างถูกต้อง
+    label = 'users' 
+
+    # ชื่อที่แสดงในหน้า Admin (พี่ James แก้ไว้สวยแล้ว ผมคงไว้ให้ครับ)
     verbose_name = 'ระบบจัดการข้อมูลนิสิตและบุคลากร (Users)'
 
     def ready(self):
         """
-        หากในอนาคตมีการทำระบบ Profile อัตโนมัติเมื่อสมัครสมาชิก 
-        เราจะนำการ import signals มาไว้ที่นี่ครับ
+        เชื่อมต่อระบบ Signals หากมีการใช้งานในอนาคต
         """
         try:
             import apps.users.signals
