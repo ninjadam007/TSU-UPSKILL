@@ -9,7 +9,7 @@ class ChatSessionAdmin(admin.ModelAdmin):
     list_filter = ('created_at',)
     search_fields = ('user__student_id', 'user__email', 'title')
     readonly_fields = ('created_at', 'updated_at')
-    ordering = ('-updated_at',) # เรียงตามการเคลื่อนไหวล่าสุด
+    ordering = ('-updated_at',)
 
     def user_link(self, obj):
         return format_html('<b style="color: #0056b3;">{}</b>', obj.user.student_id)
@@ -28,13 +28,18 @@ class ChatSessionAdmin(admin.ModelAdmin):
 
 @admin.register(Message)
 class MessageAdmin(admin.ModelAdmin):
+    # ✅ แก้ไข: ต้องมีฟังก์ชัน get_user อยู่ข้างล่างด้วย
     list_display = ('get_user', 'sender_style', 'content_preview', 'is_fallback_badge', 'created_at')
     list_filter = ('sender', 'is_fallback_to_admin', 'created_at')
     search_fields = ('session__user__student_id', 'content')
     readonly_fields = ('created_at',)
 
+    # ✅ เพิ่มฟังก์ชัน get_user ที่หายไป
+    def get_user(self, obj):
+        return obj.session.user.student_id
+    get_user.short_description = 'นิสิต'
+
     def content_preview(self, obj):
-        # แสดงข้อความแบบเต็มเมื่อเอาเมาส์ไปชี้ (Tooltip)
         return format_html('<span title="{}">{}</span>', obj.content, (obj.content[:40] + '...') if len(obj.content) > 40 else obj.content)
     content_preview.short_description = 'เนื้อหาข้อความ'
 
@@ -50,19 +55,24 @@ class MessageAdmin(admin.ModelAdmin):
 
     def is_fallback_badge(self, obj):
         if obj.is_fallback_to_admin:
-            return format_html('<span style="color: #f5222d; animation: pulse 2s infinite;">⚠️ รอแอดมิน</span>')
+            return format_html('<span style="color: #f5222d;">⚠️ รอแอดมิน</span>')
         return format_html('<span style="color: #52c41a;">✓ เรียบร้อย</span>')
     is_fallback_badge.short_description = 'สถานะ'
 
 @admin.register(PendingAdminQuestion)
 class PendingAdminQuestionAdmin(admin.ModelAdmin):
-    list_display = ('get_user', 'question_text', 'status_badge', 'view_chat_link', 'created_at')
+    # ✅ แก้ไข: เพิ่ม status เข้าไปใน list_display เพื่อให้ใช้ list_editable ได้
+    list_display = ('get_user', 'question_text', 'status', 'status_badge', 'view_chat_link', 'created_at')
     list_filter = ('status', 'created_at')
-    list_editable = ('status',) # พี่สามารถเปลี่ยนสถานะได้จากหน้าลิสต์เลย!
+    list_editable = ('status',) 
     search_fields = ('message__session__user__student_id', 'message__content')
     
+    # ✅ เพิ่มฟังก์ชัน get_user ที่หายไป
+    def get_user(self, obj):
+        return obj.message.session.user.student_id
+    get_user.short_description = 'นิสิต'
+
     def question_text(self, obj):
-        # ดึงข้อความที่เด็กถามมาโชว์เลย ไม่ต้องกดเข้าไปดู
         return obj.message.content
     question_text.short_description = 'คำถามที่ AI ตอบไม่ได้'
 
@@ -70,9 +80,9 @@ class PendingAdminQuestionAdmin(admin.ModelAdmin):
         if obj.status == 'pending':
             return format_html('<b style="color: #faad14;">⏳ กำลังรอ</b>')
         return format_html('<b style="color: #52c41a;">✅ ตอบแล้ว</b>')
-    status_badge.short_description = 'สถานะ'
+    status_badge.short_description = 'สถานะ (Badge)'
 
     def view_chat_link(self, obj):
         url = reverse('admin:chat_chatsession_change', args=[obj.message.session.id])
-        return format_html('<a class="button" href="{}" style="background: linear-gradient(45deg, #0056b3, #00a1ff); color: white; padding: 4px 12px; border-radius: 6px; border: none; font-weight: bold; text-decoration: none;">เข้าสู่แชท</a>', url)
+        return format_html('<a class="button" href="{}" style="background: #0056b3; color: white; padding: 2px 8px; border-radius: 4px; text-decoration: none;">เข้าสู่แชท</a>', url)
     view_chat_link.short_description = 'จัดการ'
